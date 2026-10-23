@@ -1,26 +1,40 @@
+
 # dependencies
-node_modules
+node_modules/
 
 # build
-dist
-dist-ssr
+dist/
+dist-ssr/
 
 # env
 .env
+.env.*
+!.env.example
 *.local
 
 # database
-chat_memory.db
+*.db
+*.db-journal
+*.sqlite
+*.sqlite3
 
 # vector database
-lancedb-data
+lancedb-data/
+knowledge.lance
 
 # knowledge files
-backend/knowledge
+backend/knowledge/
+
+# logs
+*.log
+npm-debug.log*
+yarn-debug.log*
+pnpm-debug.log*
 
 # editor
-.vscode
-.idea
+.vscode/
+.idea/
 
 # system
 .DS_Store
+

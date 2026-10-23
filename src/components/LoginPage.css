@@ -1,0 +1,233 @@
+/* LoginPage 样式表
+ * 与 LoginPage.jsx 同级，由组件顶部 import "./LoginPage.css" 引入。
+ * 所有选择器统一使用 .auth- 前缀，避免影响项目内其他页面。
+ */
+
+.auth-page{
+  --brand:#2563eb;
+  --brand-soft:#4f7cf7;
+  --ink:#0f172a;
+  --ink-2:#334155;
+  --muted:#64748b;
+  --line:#dbe2ea;
+  position:relative;
+  min-height:100vh;
+  display:grid;
+  place-items:center;
+  padding:24px;
+  overflow:hidden;
+  box-sizing:border-box;
+  font-family:system-ui,-apple-system,"Segoe UI","PingFang SC","Hiragino Sans GB","Microsoft YaHei",sans-serif;
+  color:var(--ink);
+  background:
+    radial-gradient(1100px 620px at 10% 6%, rgba(51,65,85,.85) 0%, transparent 60%),
+    radial-gradient(900px 520px at 90% 96%, rgba(37,99,235,.55) 0%, transparent 58%),
+    linear-gradient(135deg,#0b1220 0%, #0f172a 46%, #334155 100%);
+}
+.auth-page::before{
+  content:"";
+  position:absolute;
+  inset:-20%;
+  background:
+    radial-gradient(420px 420px at 18% 78%, rgba(79,124,247,.28), transparent 70%),
+    radial-gradient(360px 360px at 82% 18%, rgba(14,165,233,.22), transparent 70%);
+  filter:blur(6px);
+  pointer-events:none;
+}
+.auth-page::after{
+  content:"";
+  position:absolute;
+  inset:0;
+  background-image:
+    linear-gradient(rgba(148,163,184,.09) 1px, transparent 1px),
+    linear-gradient(90deg, rgba(148,163,184,.09) 1px, transparent 1px);
+  background-size:44px 44px;
+  -webkit-mask-image:radial-gradient(circle at 50% 42%, #000 0%, transparent 72%);
+          mask-image:radial-gradient(circle at 50% 42%, #000 0%, transparent 72%);
+  pointer-events:none;
+}
+.auth-card{
+  position:relative;
+  z-index:1;
+  width:min(420px,100%);
+  box-sizing:border-box;
+  background:#fff;
+  border-radius:20px;
+  padding:36px 34px 28px;
+  box-shadow:
+    0 32px 64px -24px rgba(2,6,23,.62),
+    0 2px 6px rgba(2,6,23,.16),
+    0 0 0 1px rgba(255,255,255,.5) inset;
+  animation:auth-rise .45s cubic-bezier(.22,.68,.36,1) both;
+}
+.auth-card::before{
+  content:"";
+  position:absolute;
+  inset:0 0 auto 0;
+  height:4px;
+  border-radius:20px 20px 0 0;
+  background:linear-gradient(90deg,#2563eb,#60a5fa 55%,#0ea5e9);
+}
+.auth-brand{
+  display:flex;
+  align-items:center;
+  gap:12px;
+  margin-bottom:26px;
+}
+.auth-logo{
+  flex:0 0 auto;
+  width:46px;
+  height:46px;
+  display:grid;
+  place-items:center;
+  border-radius:13px;
+  color:#fff;
+  background:linear-gradient(135deg,#1d4ed8,#4f7cf7 60%,#60a5fa);
+  box-shadow:0 12px 24px -12px rgba(37,99,235,.95);
+}
+.auth-title{
+  margin:0;
+  font-size:19px;
+  font-weight:650;
+  letter-spacing:.2px;
+  color:var(--ink);
+}
+.auth-sub{
+  margin:3px 0 0;
+  font-size:12.5px;
+  line-height:1.5;
+  color:var(--muted);
+}
+.auth-field{
+  display:block;
+  margin-bottom:16px;
+}
+.auth-label{
+  display:block;
+  margin-bottom:7px;
+  font-size:13px;
+  font-weight:600;
+  color:var(--ink-2);
+}
+.auth-input-wrap{
+  position:relative;
+  display:flex;
+  align-items:center;
+}
+.auth-input-icon{
+  position:absolute;
+  left:13px;
+  display:grid;
+  place-items:center;
+  color:#94a3b8;
+  pointer-events:none;
+  transition:color .18s ease;
+}
+.auth-input{
+  width:100%;
+  box-sizing:border-box;
+  padding:12px 14px 12px 41px;
+  font-family:inherit;
+  font-size:14px;
+  line-height:1.4;
+  color:var(--ink);
+  background:#f8fafc;
+  border:1px solid var(--line);
+  border-radius:10px;
+  outline:none;
+  transition:border-color .18s ease, box-shadow .18s ease, background .18s ease;
+}
+.auth-input::placeholder{ color:#a6b0be; }
+.auth-input:hover{ border-color:#c3cdda; }
+.auth-input:focus{
+  background:#fff;
+  border-color:var(--brand);
+  box-shadow:0 0 0 4px rgba(37,99,235,.14);
+}
+.auth-input-wrap:focus-within .auth-input-icon{ color:var(--brand); }
+.auth-input[aria-invalid="true"]{ border-color:#f04438; background:#fff; }
+.auth-input[aria-invalid="true"]:focus{ box-shadow:0 0 0 4px rgba(240,68,56,.14); }
+.auth-error{
+  display:flex;
+  align-items:flex-start;
+  gap:8px;
+  margin:0 0 14px;
+  padding:10px 12px;
+  font-size:13px;
+  line-height:1.5;
+  color:#b42318;
+  background:#fef3f2;
+  border:1px solid #fecdca;
+  border-radius:10px;
+  animation:auth-shake .32s ease;
+}
+.auth-error svg{ flex:0 0 auto; margin-top:1px; }
+.auth-submit{
+  display:flex;
+  align-items:center;
+  justify-content:center;
+  gap:9px;
+  width:100%;
+  margin-top:8px;
+  padding:13px 16px;
+  font-family:inherit;
+  font-size:15px;
+  font-weight:600;
+  letter-spacing:.3px;
+  color:#fff;
+  background:linear-gradient(135deg,#2563eb,#4f7cf7);
+  border:0;
+  border-radius:10px;
+  cursor:pointer;
+  box-shadow:0 12px 26px -12px rgba(37,99,235,.95);
+  transition:transform .18s ease, box-shadow .18s ease, filter .18s ease;
+}
+.auth-submit:hover:not(:disabled){
+  transform:translateY(-1px);
+  filter:brightness(1.04);
+  box-shadow:0 18px 32px -14px rgba(37,99,235,1);
+}
+.auth-submit:active:not(:disabled){ transform:translateY(0); }
+.auth-submit:focus-visible{ outline:2px solid #93c5fd; outline-offset:2px; }
+.auth-submit:disabled{
+  cursor:not-allowed;
+  opacity:.82;
+  filter:saturate(.5);
+  box-shadow:none;
+  transform:none;
+}
+.auth-spinner{
+  width:15px;
+  height:15px;
+  border-radius:50%;
+  border:2px solid rgba(255,255,255,.45);
+  border-top-color:#fff;
+  animation:auth-spin .7s linear infinite;
+}
+.auth-foot{
+  margin:20px 0 0;
+  text-align:center;
+  font-size:12px;
+  color:#94a3b8;
+}
+@keyframes auth-rise{
+  from{ opacity:0; transform:translateY(14px) scale(.985); }
+  to{ opacity:1; transform:none; }
+}
+@keyframes auth-shake{
+  0%,100%{ transform:translateX(0); }
+  25%{ transform:translateX(-3px); }
+  75%{ transform:translateX(3px); }
+}
+@keyframes auth-spin{ to{ transform:rotate(360deg); } }
+@media (max-width:420px){
+  .auth-card{ padding:28px 22px 24px; border-radius:16px; }
+  .auth-card::before{ border-radius:16px 16px 0 0; }
+  .auth-title{ font-size:17px; }
+}
+@media (prefers-reduced-motion:reduce){
+  .auth-card,.auth-error{ animation:none; }
+  .auth-input,.auth-submit,.auth-input-icon{ transition:none; }
+  .auth-spinner{ animation:none; border-top-color:rgba(255,255,255,.9); }
+}
+
