@@ -10,14 +10,18 @@ router.post("/ask", async (req, res) => {
     const sessionId = String(req.body?.sessionId || "").trim();
     if (!question) return res.status(400).json({ error: "question is required" });
     if (!sessionId) return res.status(400).json({ error: "sessionId is required" });
-    res.json({ answer: await askAssistant(question, sessionId) });
-  } catch (e) { console.error(e); res.status(500).json({ error: e.message || "Unknown error" }); }
+    if (question.length > 4000) return res.status(413).json({ error: "问题不能超过4000个字符" });
+    if (sessionId.length > 128) return res.status(400).json({ error: "sessionId is too long" });
+    const scopedSessionId = `user:${req.user.id}:session:${sessionId}`;
+    res.json({ answer: await askAssistant(question, scopedSessionId) });
+  } catch (e) { console.error(e); res.status(500).json({ error: "对话请求失败，请稍后重试" }); }
 });
 router.post("/clear-memory", async (req, res) => {
   try {
     const sessionId = String(req.body?.sessionId || "").trim();
     if (!sessionId) return res.status(400).json({ error: "sessionId is required" });
-    await clearSession(sessionId); res.json({ success: true });
-  } catch (e) { res.status(500).json({ error: e.message || "Clear memory failed" }); }
+    if (sessionId.length > 128) return res.status(400).json({ error: "sessionId is too long" });
+    await clearSession(`user:${req.user.id}:session:${sessionId}`); res.json({ success: true });
+  } catch (e) { console.error(e); res.status(500).json({ error: "清理聊天记忆失败" }); }
 });
 export default router;

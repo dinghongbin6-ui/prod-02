@@ -6,12 +6,12 @@ import { apiFetch, setToken } from "./lib/api.js";
 
 export default function App() {
   const [user, setUser] = useState(null);
-  const [checking, setChecking] = useState(true);
+  const [checking, setChecking] = useState(() => Boolean(localStorage.getItem("auth_token")));
   const [tab, setTab] = useState("chat");
   const [error, setError] = useState("");
   useEffect(() => {
     const token = localStorage.getItem("auth_token");
-    if (!token) { setChecking(false); return; }
+    if (!token) return;
     apiFetch("/auth/me").then(data => setUser(data.user)).catch(() => { setToken(""); }).finally(() => setChecking(false));
   }, []);
   const onLogin = (result) => { setToken(result.token); setUser(result.user); setTab("chat"); setError(""); };

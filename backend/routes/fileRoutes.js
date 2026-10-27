@@ -2,18 +2,22 @@ import { Router } from "express";
 import multer from "multer";
 import fs from "node:fs";
 import path from "node:path";
+import { randomUUID } from "node:crypto";
 import { fileURLToPath } from "node:url";
 import { requireAuth, requireAdmin } from "../middleware/auth.js";
+import { buildKnowledgeIndex } from "../build-index.js";
 const router = Router();
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 const KNOWLEDGE_DIR = path.resolve(__dirname, "../knowledge");
 fs.mkdirSync(KNOWLEDGE_DIR, { recursive: true });
-const allowed = new Set([".txt", ".md", ".pdf", ".doc", ".docx", ".csv", ".xls", ".xlsx", ".ppt", ".pptx"]);
+const allowed = new Set([".txt", ".md", ".json", ".pdf", ".docx", ".csv", ".xls", ".xlsx"]);
 const storage = multer.diskStorage({
   destination: (_req, _file, cb) => cb(null, KNOWLEDGE_DIR),
   filename: (_req, file, cb) => {
     const safe = path.basename(file.originalname).replace(/[\\/\0]/g, "_");
-    cb(null, safe);
+    const extension = path.extname(safe);
+    const name = path.basename(safe, extension);
+    cb(null, `${name}-${randomUUID()}${extension}`);
   }
 });
 const upload = multer({ storage, limits: { fileSize: 25 * 1024 * 1024 }, fileFilter: (_req, file, cb) => {
@@ -21,6 +25,20 @@ const upload = multer({ storage, limits: { fileSize: 25 * 1024 * 1024 }, fileFil
   cb(null, true);
 }});
 router.use(requireAuth, requireAdmin);
+let rebuilding = false;
+router.post("/rebuild-index", async (_req, res) => {
+  if (rebuilding) return res.status(409).json({ error: "知识库正在重建，请稍后再试" });
+  rebuilding = true;
+  try {
+    const result = await buildKnowledgeIndex();
+    res.json({ success: true, ...result, message: `知识库重建完成：${result.files} 个文件，${result.chunks} 个文本块` });
+  } catch (error) {
+    console.error("知识库重建失败:", error);
+    res.status(500).json({ error: error.message || "知识库重建失败" });
+  } finally {
+    rebuilding = false;
+  }
+});
 router.get("/", (_req, res) => {
   try {
     const files = fs.readdirSync(KNOWLEDGE_DIR, { withFileTypes: true }).filter(x => x.isFile()).map(x => {

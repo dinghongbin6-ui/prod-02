@@ -1,6 +1,4 @@
-import dotenv from "dotenv";
-
-dotenv.config();
+import "../config.js";
 
 export async function getWeather(city) {
   const cityMap = {
@@ -31,12 +29,18 @@ export async function getWeather(city) {
   }
 
   const targetCity = cityMap[city] || city;
-
-  const url =
-    `https://api.openweathermap.org/data/2.5/weather?q=${targetCity}&appid=${apiKey}&units=metric&lang=zh_cn`;
+  const params = new URLSearchParams({
+    q: targetCity,
+    appid: apiKey,
+    units: "metric",
+    lang: "zh_cn"
+  });
+  const url = `https://api.openweathermap.org/data/2.5/weather?${params}`;
+  const controller = new AbortController();
+  const timeout = setTimeout(() => controller.abort(), 10000);
 
   try {
-    const response = await fetch(url);
+    const response = await fetch(url, { signal: controller.signal });
 
     if (!response.ok) {
       return {
@@ -70,7 +74,9 @@ export async function getWeather(city) {
   } catch (err) {
     return {
       success: false,
-      error: err.message || "天气查询异常"
+      error: err.name === "AbortError" ? "天气查询超时，请稍后重试" : err.message || "天气查询异常"
     };
+  } finally {
+    clearTimeout(timeout);
   }
 }

@@ -1,48 +1,48 @@
 import dotenv from "dotenv";
+import path from "node:path";
+import { fileURLToPath } from "node:url";
 
-dotenv.config();
-
-const LMSTUDIO_URL = process.env.LMSTUDIO_embeddings_API;
-const API_KEY = `Bearer ${process.env.LMSTUDIO_KEY}`;
+const projectRoot = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "..");
+dotenv.config({ path: path.join(projectRoot, ".env") });
 
 export async function getEmbedding(text) {
+  const endpoint = process.env.LMSTUDIO_embeddings_API;
+  if (!endpoint) throw new Error("LMSTUDIO_embeddings_API is not configured");
 
-  const response =
-    await fetch(
-      LMSTUDIO_URL,
-      {
-        method: "POST",
-
-        headers: {
-          "Content-Type":
-            "application/json",
-
-          Authorization:
-            API_KEY
-        },
-
-        body: JSON.stringify({
-          model:
-            "text-embedding-nomic-embed-text-v1.5",
-
-          input:
-            text
-        })
-      }
-    );
-
-  if (!response.ok) {
-
-    const errorText =
-      await response.text();
-
-    throw new Error(
-      `Embedding Error: ${errorText}`
-    );
+  const headers = { "Content-Type": "application/json" };
+  if (process.env.LMSTUDIO_KEY) {
+    headers.Authorization = `Bearer ${process.env.LMSTUDIO_KEY}`;
   }
 
-  const data =
-    await response.json();
+  const controller = new AbortController();
+  const timeout = setTimeout(() => controller.abort(), 60_000);
 
-  return data.data[0].embedding;
+  try {
+    const response = await fetch(endpoint, {
+      method: "POST",
+      headers,
+      body: JSON.stringify({
+        model: "text-embedding-nomic-embed-text-v1.5",
+        input: text
+      }),
+      signal: controller.signal
+    });
+
+    if (!response.ok) {
+      const errorText = (await response.text()).slice(0, 1000);
+      throw new Error(`Embedding HTTP ${response.status}: ${errorText}`);
+    }
+
+    const data = await response.json();
+    const embedding = data?.data?.[0]?.embedding;
+    if (!Array.isArray(embedding) || embedding.length === 0) {
+      throw new Error("Embedding API returned no embedding vector");
+    }
+    return embedding;
+  } catch (error) {
+    if (error.name === "AbortError") throw new Error("Embedding API request timed out");
+    throw error;
+  } finally {
+    clearTimeout(timeout);
+  }
 }

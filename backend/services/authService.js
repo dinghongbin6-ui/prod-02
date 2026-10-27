@@ -1,7 +1,9 @@
+import { validateServerConfig } from "../config.js";
 import { get, run } from "../database.js";
 import { hashPassword, verifyPassword } from "../security/passwords.js";
 
 export async function ensureInitialAdmin() {
+  validateServerConfig();
   const username = process.env.ADMIN_USERNAME || "admin";
   const password = process.env.ADMIN_PASSWORD;
   if (!password || password.includes("替换成你自己的强密码")) {

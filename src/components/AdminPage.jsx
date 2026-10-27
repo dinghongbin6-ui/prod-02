@@ -1,4 +1,4 @@
-import { useEffect, useState } from "react";
+import { useCallback, useEffect, useState } from "react";
 import { apiFetch } from "../lib/api.js";
 import "./AdminPage.css";
 
@@ -10,24 +10,40 @@ export default function AdminPage({ mode }) {
   const [selectedFile, setSelectedFile] = useState(null);
   const [error, setError] = useState("");
   const [busy, setBusy] = useState(false);
+  const [rebuildMessage, setRebuildMessage] = useState("");
 
-  const load = async () => {
-    setError("");
+  const load = useCallback(async () => {
     try {
       if (mode === "users") {
         const d = await apiFetch("/admin/users");
+        setError("");
         setUsers(d.users || []);
       } else if (mode === "files") {
         const d = await apiFetch("/admin/files");
+        setError("");
         setFiles(d.files || []);
       }
     } catch (e) {
       setError(e.message);
     }
-  };
+  }, [mode]);
 
   useEffect(() => {
-    load();
+    let active = true;
+    const request = mode === "users"
+      ? apiFetch("/admin/users")
+      : apiFetch("/admin/files");
+
+    request.then((data) => {
+      if (!active) return;
+      setError("");
+      if (mode === "users") setUsers(data.users || []);
+      else setFiles(data.files || []);
+    }).catch((error) => {
+      if (active) setError(error.message);
+    });
+
+    return () => { active = false; };
   }, [mode]);
 
   const createUser = async (e) => {
@@ -85,6 +101,21 @@ export default function AdminPage({ mode }) {
       await load();
     } catch (e) {
       setError(e.message);
+    }
+  };
+
+  const rebuildIndex = async () => {
+    if (!confirm("将根据当前所有知识文件重建向量索引，确定继续吗？")) return;
+    setBusy(true);
+    setError("");
+    setRebuildMessage("");
+    try {
+      const result = await apiFetch("/admin/files/rebuild-index", { method: "POST" });
+      setRebuildMessage(result.message || "知识库重建完成");
+    } catch (e) {
+      setError(e.message);
+    } finally {
+      setBusy(false);
     }
   };
 
@@ -179,7 +210,7 @@ export default function AdminPage({ mode }) {
                 type="file"
                 required
                 onChange={(e) => setSelectedFile(e.target.files?.[0] || null)}
-                accept=".txt,.md,.pdf,.doc,.docx,.csv,.xls,.xlsx,.ppt,.pptx"
+                accept=".txt,.md,.json,.pdf,.docx,.csv,.xls,.xlsx"
                 className="admin-file-input"
               />
               <span className="admin-file-placeholder">
@@ -193,8 +224,16 @@ export default function AdminPage({ mode }) {
           </form>
 
           <p className="admin-tip">
-            支持常见文档格式，单个文件最大25MB。上传或删除源文件后，需要按项目现有流程更新 LanceDB 索引。
+            支持常见文档格式，单个文件最大25MB。上传或删除源文件后，点击“重建知识库”使检索索引更新。
           </p>
+
+          <div className="admin-form">
+            <button type="button" onClick={rebuildIndex} disabled={busy} className="admin-btn admin-btn-primary">
+              {busy && <span className="admin-spinner" />}
+              {busy ? "正在重建…" : "重建知识库"}
+            </button>
+            {rebuildMessage && <span role="status">{rebuildMessage}</span>}
+          </div>
 
           <div className="admin-table-wrap">
             <table className="admin-table">

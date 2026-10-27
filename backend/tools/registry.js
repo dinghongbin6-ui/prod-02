@@ -9,7 +9,7 @@ export const toolRegistry = {
       type: "function",
       function: {
         name: "get_weather",
-        description: "查询城市实时天气",
+        description: "查询城市实时天气。凡用户询问天气、气温、温度、降雨、湿度、体感或根据当前天气建议穿衣时必须调用此工具。",
         parameters: {
           type: "object",
           properties: {

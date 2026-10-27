@@ -17,6 +17,8 @@ const XLSX = require("xlsx");
 
 import { getEmbedding } from "./embedding.js";
 import { db, getTable } from "./lancedb.js";
+import { mapWithConcurrency } from "./services/embeddingBatch.js";
+import { assertIndexBuildCanCommit } from "./services/indexBuildPolicy.js";
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
@@ -107,8 +109,7 @@ async function readFileContent(fullPath) {
     case ".xls":
       return await readExcel(fullPath);
     default:
-      console.log(`⚠️  跳过不支持的文件格式: ${ext}`);
-      return null;
+      throw new Error(`不支持的文件格式: ${ext || "(无扩展名)"}`);
   }
 }
 
@@ -117,33 +118,32 @@ async function readFileContent(fullPath) {
 主构建程序
 ========================================
 */
-async function build() {
+export async function buildKnowledgeIndex() {
   console.log("🚀 开始构建知识库索引...");
   console.log(`🔗 当前嵌入API地址: ${process.env.LMSTUDIO_embeddings_API}`);
 
   if (!fs.existsSync(knowledgeDir)) {
     fs.mkdirSync(knowledgeDir, { recursive: true });
     console.log("ℹ️  已自动创建knowledge目录，请放入文档后重新运行");
-    return;
+    throw new Error("knowledge 目录不存在，已创建空目录；请先上传知识文件再重建索引");
   }
 
   let table = await getTable();
   const files = fs.readdirSync(knowledgeDir);
   const rows = [];
+  const failures = [];
 
   for (const file of files) {
     try {
       const fullPath = path.join(knowledgeDir, file);
       if (!fs.statSync(fullPath).isFile()) continue;
 
-      // 中文/日文文件名自动转码
-      const fileName = Buffer.from(file, 'latin1').toString('utf8');
+      const fileName = file;
       console.log(`📄 正在读取文件: ${fileName}`);
 
       let content = await readFileContent(fullPath);
       if (!content || !content.trim()) {
-        console.log(`⚠️  文件内容为空或无有效文字层: ${fileName}（如果是扫描版/图片版PDF需要OCR识别）`);
-        continue;
+        throw new Error("文件内容为空或没有可提取的文字层（扫描版 PDF 需要 OCR）");
       }
 
       // 文本清洗
@@ -158,9 +158,7 @@ async function build() {
       console.log(`✅ ${fileName} => 分割为 ${chunks.length} 个文本块`);
 
       // 批量生成向量
-      const embeddings = await Promise.all(
-        chunks.map(chunk => getEmbedding(chunk))
-      );
+      const embeddings = await mapWithConcurrency(chunks, 3, (chunk) => getEmbedding(chunk));
 
       for (let i = 0; i < chunks.length; i++) {
         rows.push({
@@ -173,15 +171,13 @@ async function build() {
       }
 
     } catch (error) {
-      const fileName = Buffer.from(file, 'latin1').toString('utf8');
+      const fileName = file;
       console.error(`❌ 处理文件失败 ${fileName}:`, error.message);
+      failures.push({ file: fileName, error: error.message });
     }
   }
 
-  if (rows.length === 0) {
-    console.log("ℹ️  没有可索引的有效文档内容");
-    return;
-  }
+  assertIndexBuildCanCommit(failures, rows);
 
   if (!table) {
     console.log("🆕 正在创建LanceDB向量表...");
@@ -197,9 +193,12 @@ async function build() {
   }
 
   console.log(`🎉 索引构建完成！共成功索引 ${rows.length} 个文本块，来自 ${new Set(rows.map(r => r.file)).size} 个文件`);
+  return { chunks: rows.length, files: new Set(rows.map(r => r.file)).size };
 }
 
-build().catch(err => {
-  console.error("❌ 索引构建失败:", err);
-  process.exit(1);
-});
+if (process.argv[1] && path.resolve(process.argv[1]) === __filename) {
+  buildKnowledgeIndex().catch(err => {
+    console.error("❌ 索引构建失败:", err);
+    process.exitCode = 1;
+  });
+}

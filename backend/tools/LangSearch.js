@@ -1,4 +1,6 @@
 
+import "../config.js";
+
 const LANGSEARCH_API_URL =
   "https://api.langsearch.com/v1/web-search";
 
@@ -14,7 +16,7 @@ export async function searchWeb(args = {}) {
 
   if (!apiKey) {
     throw new Error(
-      "缺少 LANGSEARCH_API_KEY，请检查 backend/.env"
+      "缺少 LANGSEARCH_API_KEY，请检查项目根目录 .env"
     );
   }
 
