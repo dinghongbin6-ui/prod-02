@@ -2,6 +2,7 @@ import fs from "fs";
 import path from "path";
 import { fileURLToPath } from "url";
 import dotenv from "dotenv";
+import { Index } from "@lancedb/lancedb";
 
 // 自动加载项目根目录的.env文件
 dotenv.config({ path: path.resolve(fileURLToPath(import.meta.url), '../../.env') });
@@ -17,27 +18,14 @@ const XLSX = require("xlsx");
 
 import { getEmbedding } from "./embedding.js";
 import { db, getTable } from "./lancedb.js";
+import { all } from "./database.js";
 import { mapWithConcurrency } from "./services/embeddingBatch.js";
 import { assertIndexBuildCanCommit } from "./services/indexBuildPolicy.js";
+import { splitText } from "./services/chunking.js";
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
 const knowledgeDir = path.join(__dirname, "knowledge");
-
-/*
-========================================
-文本切块
-========================================
-*/
-function splitText(text, chunkSize = 1000, overlap = 200) {
-  const chunks = [];
-  let start = 0;
-  while (start < text.length) {
-    chunks.push(text.slice(start, start + chunkSize));
-    start += chunkSize - overlap;
-  }
-  return chunks;
-}
 
 /*
 ========================================
@@ -128,7 +116,9 @@ export async function buildKnowledgeIndex() {
     throw new Error("knowledge 目录不存在，已创建空目录；请先上传知识文件再重建索引");
   }
 
-  let table = await getTable();
+  const table = await getTable();
+  const metadataRows = await all("SELECT file_name, product_name, subject FROM knowledge_file_metadata");
+  const metadataByFile = new Map(metadataRows.map((item) => [item.file_name, item]));
   const files = fs.readdirSync(knowledgeDir);
   const rows = [];
   const failures = [];
@@ -140,6 +130,10 @@ export async function buildKnowledgeIndex() {
 
       const fileName = file;
       console.log(`📄 正在读取文件: ${fileName}`);
+      const metadata = metadataByFile.get(fileName);
+      if (!metadata?.product_name?.trim() || !metadata?.subject?.trim()) {
+        throw new Error("缺少核心主体/产品或主题元数据，请在管理员文件管理页面填写并保存");
+      }
 
       let content = await readFileContent(fullPath);
       if (!content || !content.trim()) {
@@ -158,7 +152,9 @@ export async function buildKnowledgeIndex() {
       console.log(`✅ ${fileName} => 分割为 ${chunks.length} 个文本块`);
 
       // 批量生成向量
-      const embeddings = await mapWithConcurrency(chunks, 3, (chunk) => getEmbedding(chunk));
+      const embeddings = await mapWithConcurrency(chunks, 3, (chunk) => getEmbedding(
+        `核心主体/产品：${metadata.product_name}\n主题：${metadata.subject}\n正文：${chunk}`
+      ));
 
       for (let i = 0; i < chunks.length; i++) {
         rows.push({
@@ -179,17 +175,27 @@ export async function buildKnowledgeIndex() {
 
   assertIndexBuildCanCommit(failures, rows);
 
-  if (!table) {
-    console.log("🆕 正在创建LanceDB向量表...");
-    table = await db.createTable("knowledge", rows);
+  console.log("🔄 正在更新知识库向量表...");
+  if (table) {
+    await table.add(rows, { mode: "overwrite" });
   } else {
-    console.log("🔄 正在重建知识库向量索引...");
-    try {
-      await table.delete("id != ''");
-    } catch {
-      console.log("ℹ️  旧表为空，跳过清空操作");
-    }
-    await table.add(rows);
+    await db.createTable("knowledge", rows);
+  }
+
+  try {
+    const updatedTable = await getTable();
+    await updatedTable.createIndex("content", {
+      config: Index.fts({
+        baseTokenizer: "ngram",
+        ngramMinLength: 2,
+        ngramMaxLength: 3,
+        removeStopWords: false,
+      }),
+      replace: true,
+    });
+    console.log("✅ 已更新中文 n-gram 全文检索索引");
+  } catch (error) {
+    console.warn("⚠️ 全文检索索引创建失败，将由关键词扫描回退：", error.message);
   }
 
   console.log(`🎉 索引构建完成！共成功索引 ${rows.length} 个文本块，来自 ${new Set(rows.map(r => r.file)).size} 个文件`);

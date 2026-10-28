@@ -23,6 +23,12 @@ db.serialize(() => {
     role TEXT NOT NULL CHECK(role IN ('admin','user')),
     created_at DATETIME DEFAULT CURRENT_TIMESTAMP
   )`);
+  db.run(`CREATE TABLE IF NOT EXISTS knowledge_file_metadata (
+    file_name TEXT PRIMARY KEY,
+    product_name TEXT NOT NULL,
+    subject TEXT NOT NULL,
+    updated_at DATETIME DEFAULT CURRENT_TIMESTAMP
+  )`);
 });
 
 export function run(sql, params = []) {

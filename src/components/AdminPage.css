@@ -72,6 +72,7 @@
   outline:none;
   transition:border-color .18s ease, box-shadow .18s ease, background .18s ease;
 }
+.admin-metadata-input{ min-width:180px; }
 .admin-input:hover{ border-color:#cbd5e1; }
 .admin-input:focus{
   background:#fff;

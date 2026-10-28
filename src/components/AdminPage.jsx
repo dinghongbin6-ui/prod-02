@@ -8,6 +8,8 @@ export default function AdminPage({ mode }) {
   const [username, setUsername] = useState("");
   const [password, setPassword] = useState("");
   const [selectedFile, setSelectedFile] = useState(null);
+  const [productName, setProductName] = useState("");
+  const [subject, setSubject] = useState("");
   const [error, setError] = useState("");
   const [busy, setBusy] = useState(false);
   const [rebuildMessage, setRebuildMessage] = useState("");
@@ -82,9 +84,13 @@ export default function AdminPage({ mode }) {
     setError("");
     try {
       const form = new FormData();
+      form.append("productName", productName);
+      form.append("subject", subject);
       form.append("file", selectedFile);
       await apiFetch("/admin/files", { method: "POST", body: form });
       setSelectedFile(null);
+      setProductName("");
+      setSubject("");
       e.target.reset();
       await load();
     } catch (err) {
@@ -95,12 +101,33 @@ export default function AdminPage({ mode }) {
   };
 
   const deleteFile = async (f) => {
-    if (!confirm(`确定删除文件 ${f.filename}？`)) return;
+    if (!confirm(`确定删除文件 ${f.displayFilename || f.filename}？`)) return;
     try {
       await apiFetch(`/admin/files/${encodeURIComponent(f.filename)}`, { method: "DELETE" });
       await load();
     } catch (e) {
       setError(e.message);
+    }
+  };
+
+  const updateFileMetadata = (filename, field, value) => {
+    setFiles((current) => current.map((file) => file.filename === filename ? { ...file, [field]: value } : file));
+  };
+
+  const saveMetadata = async (file) => {
+    setBusy(true);
+    setError("");
+    setRebuildMessage("");
+    try {
+      const result = await apiFetch(`/admin/files/${encodeURIComponent(file.filename)}/metadata`, {
+        method: "PUT",
+        body: JSON.stringify({ productName: file.productName, subject: file.subject }),
+      });
+      setRebuildMessage(result.message || "元数据已保存");
+    } catch (e) {
+      setError(e.message);
+    } finally {
+      setBusy(false);
     }
   };
 
@@ -205,6 +232,14 @@ export default function AdminPage({ mode }) {
       ) : (
         <>
           <form className="admin-form" onSubmit={upload}>
+            <label className="admin-field">
+              <span className="admin-label">核心主体 / 产品名称</span>
+              <input required maxLength={200} value={productName} onChange={(e) => setProductName(e.target.value)} placeholder="例如：平安产险少儿门急诊医疗保险" className="admin-input" />
+            </label>
+            <label className="admin-field">
+              <span className="admin-label">主题 / 规则</span>
+              <input required maxLength={300} value={subject} onChange={(e) => setSubject(e.target.value)} placeholder="例如：保险责任认定" className="admin-input" />
+            </label>
             <label className="admin-file-field">
               <input
                 type="file"
@@ -224,7 +259,7 @@ export default function AdminPage({ mode }) {
           </form>
 
           <p className="admin-tip">
-            支持常见文档格式，单个文件最大25MB。上传或删除源文件后，点击“重建知识库”使检索索引更新。
+            每份文件都要填写核心主体/产品和主题/规则；文件名只用于定位，不会自动当成主体。元数据保存后，点击“重建知识库”更新向量索引。
           </p>
 
           <div className="admin-form">
@@ -240,6 +275,8 @@ export default function AdminPage({ mode }) {
               <thead>
                 <tr>
                   <th>文件名</th>
+                  <th>核心主体 / 产品</th>
+                  <th>主题 / 规则</th>
                   <th>大小</th>
                   <th>更新时间</th>
                   <th>操作</th>
@@ -248,10 +285,15 @@ export default function AdminPage({ mode }) {
               <tbody>
                 {files.map((f) => (
                   <tr key={f.filename}>
-                    <td>{f.filename}</td>
+                    <td>{f.displayFilename || f.filename}</td>
+                    <td><input className="admin-input admin-metadata-input" maxLength={200} value={f.productName || ""} onChange={(e) => updateFileMetadata(f.filename, "productName", e.target.value)} aria-label={`${f.displayFilename || f.filename} 核心主体或产品`} /></td>
+                    <td><input className="admin-input admin-metadata-input" maxLength={300} value={f.subject || ""} onChange={(e) => updateFileMetadata(f.filename, "subject", e.target.value)} aria-label={`${f.displayFilename || f.filename} 主题或规则`} /></td>
                     <td>{(f.size / 1024).toFixed(1)} KB</td>
                     <td>{new Date(f.updatedAt).toLocaleString()}</td>
                     <td>
+                      <button disabled={busy} onClick={() => saveMetadata(f)} className="admin-btn admin-btn-primary">
+                        保存元数据
+                      </button>
                       <button onClick={() => deleteFile(f)} className="admin-btn admin-btn-danger">
                         删除
                       </button>

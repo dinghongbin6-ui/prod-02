@@ -1,0 +1,4 @@
+<powershell>
+$ErrorActionPreference = "Stop"
+New-NetFirewallRule -DisplayName "LM Studio API from application EC2" -Direction Inbound -Protocol TCP -LocalPort ${lmstudio_port} -RemoteAddress "${linux_private_ip}/32" -Action Allow -Profile Any
+</powershell>

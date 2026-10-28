@@ -3,11 +3,14 @@ import { apiFetch } from "../lib/api.js";
 import "./ChatPage.css";
 
 const newId = () => globalThis.crypto?.randomUUID?.() || `${Date.now()}-${Math.random().toString(36).slice(2)}`;
+const DOCUMENT_FORMATS = [["docx", "Word（DOCX）"], ["xlsx", "Excel（XLSX）"], ["csv", "CSV"], ["md", "Markdown"], ["txt", "纯文本"]];
 
 export default function ChatPage() {
   const [question, setQuestion] = useState("");
   const [messages, setMessages] = useState([]);
   const [loading, setLoading] = useState(false);
+  const [documentFormat, setDocumentFormat] = useState("docx");
+  const [exporting, setExporting] = useState(null);
 
   const [sessionId] = useState(() => {
     let id = localStorage.getItem("session_id");
@@ -30,11 +33,32 @@ export default function ChatPage() {
         method: "POST",
         body: JSON.stringify({ question: q, sessionId }),
       });
-      setMessages((m) => [...m, { role: "assistant", content: d.answer || "无回答" }]);
+      if (d.error) throw new Error(d.error);
+      setMessages((m) => [...m, { role: "assistant", content: d.answer || "无回答", sources: d.sources || [], toolResults: d.toolResults || [], question: q }]);
     } catch (err) {
       setMessages((m) => [...m, { role: "assistant", content: `错误：${err.message}` }]);
     } finally {
       setLoading(false);
+    }
+  };
+
+  const downloadDocument = async (message, index) => {
+    setExporting(index);
+    try {
+      const response = await apiFetch("/generate-document", {
+        method: "POST",
+        body: JSON.stringify({ format: documentFormat, question: message.question, answer: message.content, sources: message.sources || [], toolResults: message.toolResults || [] }),
+      });
+      const url = URL.createObjectURL(response.blob);
+      const link = document.createElement("a");
+      link.href = url;
+      link.download = `问答结果.${documentFormat}`;
+      link.click();
+      URL.revokeObjectURL(url);
+    } catch (err) {
+      alert(err.message);
+    } finally {
+      setExporting(null);
     }
   };
 
@@ -74,9 +98,19 @@ export default function ChatPage() {
           <>
             {messages.map((m, i) => (
               <div key={i} className={`chat-bubble-row ${m.role === "user" ? "chat-bubble-right" : "chat-bubble-left"}`}>
-                <span className={`chat-bubble ${m.role === "user" ? "chat-bubble-user" : "chat-bubble-assistant"}`}>
-                  {m.content}
-                </span>
+                <div className={`chat-bubble ${m.role === "user" ? "chat-bubble-user" : "chat-bubble-assistant"}`}>
+                  <div>{m.content}</div>
+                  {m.role === "assistant" && m.question && <details className="chat-result-details">
+                    <summary>查看查询结果（来源 {m.sources?.length || 0}，工具 {m.toolResults?.length || 0}）</summary>
+                    <div><strong>知识库来源</strong>{m.sources?.length > 0 ? m.sources.map((source, j) => <div className="chat-result-item" key={j}><b>{source.file}{source.chunkId ? ` · 片段 ${source.chunkId}` : ""} · {source.matchType || "语义匹配"}{source.matchedPhrase ? `（${source.matchedPhrase}）` : ""}</b><p>主体/产品：{source.productName || "未标注"} · 主题/规则：{source.subject || "未标注"}</p><p>{source.content}</p></div>) : <p>本次没有检索到知识库片段。</p>}</div>
+                    <div><strong>工具查询结果</strong>{m.toolResults?.length > 0 ? m.toolResults.map((tool, j) => <pre className="chat-result-item" key={j}>{tool.tool}: {JSON.stringify(tool.result, null, 2)}</pre>) : <p>本次没有调用工具。</p>}</div>
+                  </details>}
+                  {m.role === "assistant" && m.question && <div className="chat-document-actions">
+                    <button type="button" className="chat-btn chat-btn-secondary" onClick={() => downloadDocument(m, i)} disabled={exporting !== null}>
+                      {exporting === i ? "生成中…" : "生成并下载文档"}
+                    </button>
+                  </div>}
+                </div>
               </div>
             ))}
           </>
@@ -107,6 +141,12 @@ export default function ChatPage() {
           className="chat-textarea"
         />
         <div className="chat-input-actions">
+          <label className="chat-format-picker">
+            <span>回答文档格式</span>
+            <select aria-label="回答文档格式" value={documentFormat} onChange={(e) => setDocumentFormat(e.target.value)} disabled={exporting !== null}>
+              {DOCUMENT_FORMATS.map(([value, label]) => <option value={value} key={value}>{label}</option>)}
+            </select>
+          </label>
           <button
             type="submit"
             disabled={loading || !question.trim()}
