@@ -19,7 +19,7 @@ jobs:
     env:
       EC2_HOST: 54.199.225.238
       EC2_USER: ec2-user
-      EC2_DEPLOY_PATH: /home/ec2-user/my-prod-app-02
+      EC2_DEPLOY_PATH: /home/ec2-user/prod-app
 
     steps:
       - name: Check out repository
