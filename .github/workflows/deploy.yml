@@ -51,8 +51,9 @@ jobs:
 
           key_file="$RUNNER_TEMP/ec2_deploy_key"
           trap 'rm -f "$key_file"' EXIT
-          printf '%s\n' "$EC2_SSH_KEY" > "$key_file"
+          printf '%s\n' "$EC2_SSH_KEY" | tr -d '\r' > "$key_file"
           chmod 600 "$key_file"
+          ssh-keygen -y -f "$key_file" >/dev/null
 
           mkdir -p "$HOME/.ssh"
           printf '%s\n' "$EC2_KNOWN_HOSTS" > "$HOME/.ssh/known_hosts"
@@ -63,5 +64,24 @@ jobs:
             -o IdentitiesOnly=yes \
             -o StrictHostKeyChecking=yes \
             -o ConnectTimeout=20 \
-            "$EC2_USER@$EC2_HOST" \
-            "cd '$EC2_DEPLOY_PATH' && git pull --ff-only origin main && npm ci && npm run build && pm2 restart prod-backend --update-env && curl --fail http://127.0.0.1:3001/health"
+            "$EC2_USER@$EC2_HOST" "bash -s -- '$EC2_DEPLOY_PATH'" <<'REMOTE'
+          set -euo pipefail
+          DEPLOY_PATH="$1"
+          cd "$DEPLOY_PATH"
+          git pull --ff-only origin main
+          npm ci
+          npm run build
+          pm2 restart prod-backend --update-env
+
+          for attempt in {1..30}; do
+            if curl --fail --silent http://127.0.0.1:3001/health; then
+              printf '\nBackend health check passed.\n'
+              exit 0
+            fi
+            sleep 2
+          done
+
+          echo "Backend did not become healthy within 60 seconds. PM2 logs:"
+          pm2 logs prod-backend --lines 80 --nostream || true
+          exit 1
+          REMOTE
