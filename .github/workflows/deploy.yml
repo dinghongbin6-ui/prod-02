@@ -64,4 +64,4 @@ jobs:
             -o StrictHostKeyChecking=yes \
             -o ConnectTimeout=20 \
             "$EC2_USER@$EC2_HOST" \
-            "cd '$EC2_DEPLOY_PATH' && git pull --ff-only origin main && npm ci && npm run build && pm2 restart enterprise-ai-api --update-env && curl --fail http://127.0.0.1:3001/health"
+            "cd '$EC2_DEPLOY_PATH' && git pull --ff-only origin main && npm ci && npm run build && pm2 restart prod-backend --update-env && curl --fail http://127.0.0.1:3001/health"
